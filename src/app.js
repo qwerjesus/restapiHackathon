@@ -4,6 +4,7 @@ const cors = require('cors');
 const eventsRoutes = require('./routes/events.routes');
 const placesRoutes = require('./routes/places.routes');
 const foodRoutes = require('./routes/food.routes');
+const recommendationsRoutes = require('./routes/recommendations.routes');
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.get('/health', (req, res) => {
 app.use('/api/events', eventsRoutes);
 app.use('/api/places', placesRoutes);
 app.use('/api/food', foodRoutes);
+app.use('/api/recommendations', recommendationsRoutes);
 
 // 404 Route Handler
 app.use((req, res, next) => {

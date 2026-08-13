@@ -1,0 +1,838 @@
+# FASE 4 — MÓDULO DE RECOMENDACIONES CON GEMINI 2.5 FLASH
+A partir de ahora implementa únicamente la Fase 4:
+MÓDULO DE RECOMENDACIONES CON IA UTILIZANDO GEMINI 2.5 FLASH.
+
+==================================================
+1. OBJETIVO
+==================================================
+
+Crear un módulo de recomendaciones basado en IA que permita seleccionar entre 5 y 6 elementos destacados según la categoría solicitada y, opcionalmente, según un interés del usuario.
+
+El objetivo es que la API pueda responder preguntas como:
+
+"Recomiéndame los lugares más interesantes de Cartagena dentro de la categoría Museos."
+
+Ejemplo:
+
+GET /api/recommendations/places?category=Museos
+
+También debe permitir:
+
+GET /api/recommendations/places?category=Museos&interest=historia
+
+La IA debe seleccionar y ordenar los candidatos que nuestro backend le proporcione.
+
+IMPORTANTE:
+
+Gemini NO debe buscar información externa sobre Cartagena.
+
+Gemini NO debe inventar lugares.
+
+Gemini NO debe inventar atributos de lugares, eventos o gastronomía.
+
+Gemini solamente puede seleccionar, ordenar y generar una explicación breve utilizando los datos entregados por nuestro backend.
+
+==================================================
+2. MODELO DE IA
+==================================================
+
+Utilizar exclusivamente:
+
+Gemini 2.5 Flash
+
+Modelo:
+
+gemini-2.5-flash
+
+No utilizar Gemini Pro.
+
+No utilizar modelos diferentes salvo que sea estrictamente necesario para resolver un error de compatibilidad, y en ese caso detenerse y reportarlo antes de cambiarlo.
+
+La integración debe utilizar el SDK oficial actual de Google para JavaScript:
+
+@google/genai
+
+Instalar:
+
+npm install @google/genai
+
+NO utilizar:
+
+@google/generative-ai
+
+No utilizar la biblioteca antigua/legacy.
+
+==================================================
+3. CONFIGURACIÓN DE GEMINI
+==================================================
+
+Agregar al archivo .env.example:
+
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_TIMEOUT_MS=10000
+
+La API key debe obtenerse exclusivamente desde:
+
+process.env.GEMINI_API_KEY
+
+Nunca colocar la API key directamente en el código.
+
+Nunca mostrar la API key en:
+
+- logs
+- respuestas HTTP
+- mensajes de error
+- README
+- pruebas
+- Git
+
+El archivo .env debe permanecer fuera del repositorio.
+
+El archivo .env.example sí debe formar parte del proyecto.
+
+==================================================
+4. SDK OFICIAL DE GOOGLE
+==================================================
+
+Crear la integración:
+
+src/integrations/gemini.api.js
+
+Utilizar:
+
+import { GoogleGenAI } from "@google/genai";
+
+La inicialización debe utilizar la API key desde variables de entorno.
+
+Conceptualmente:
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY
+});
+
+No copiar literalmente este ejemplo si la versión instalada del SDK requiere una sintaxis diferente.
+
+Utilizar la API oficial y actual de @google/genai compatible con Gemini 2.5 Flash.
+
+==================================================
+5. STRUCTURED OUTPUT
+==================================================
+
+Utilizar Structured Output / respuesta JSON estructurada de Gemini.
+
+La respuesta esperada de Gemini debe tener esta estructura:
+
+{
+  "recommendations": [
+    {
+      "id": "place-123",
+      "reason": "Destaca por su relación con la historia de Cartagena."
+    }
+  ]
+}
+
+El modelo solamente debe devolver:
+
+- id
+- reason
+
+No debe devolver nuevamente todos los datos completos del lugar.
+
+Configurar la respuesta para utilizar:
+
+responseMimeType: "application/json"
+
+y un response schema apropiado.
+
+El esquema debe representar:
+
+recommendations:
+  array
+    id: string
+    reason: string
+
+La respuesta de Gemini debe ser parseada y validada por nuestro backend.
+
+NO confiar únicamente en el schema de Gemini.
+
+==================================================
+6. ARQUITECTURA
+==================================================
+
+Mantener la arquitectura actual:
+
+Controller
+    ↓
+Service
+    ↓
+Integration
+
+Agregar únicamente:
+
+src/controllers/recommendations.controller.js
+
+src/services/recommendations.service.js
+
+src/integrations/gemini.api.js
+
+src/routes/recommendations.routes.js
+
+Integrar la nueva ruta desde:
+
+src/app.js
+
+La estructura conceptual debe ser:
+
+Client
+   ↓
+recommendations.routes.js
+   ↓
+recommendations.controller.js
+   ↓
+recommendations.service.js
+   ↓
+gemini.api.js
+   ↓
+@google/genai
+   ↓
+Gemini 2.5 Flash
+
+El recommendations.service.js será responsable de coordinar:
+
+- obtener datos;
+- filtrar;
+- hacer ranking preliminar;
+- seleccionar candidatos;
+- enviar candidatos a Gemini;
+- validar respuesta;
+- construir respuesta REST.
+
+NO colocar lógica de Gemini dentro de:
+
+- places.service.js
+- events.service.js
+- food.service.js
+
+==================================================
+7. ENDPOINTS
+==================================================
+
+Implementar únicamente:
+
+GET /api/recommendations/places
+
+GET /api/recommendations/events
+
+GET /api/recommendations/food
+
+No implementar todavía:
+
+- usuarios;
+- autenticación;
+- historial;
+- perfiles;
+- recomendaciones persistentes;
+- base de datos;
+- aprendizaje personalizado.
+
+==================================================
+8. PARÁMETROS
+==================================================
+
+Places:
+
+GET /api/recommendations/places?category=Museos
+
+GET /api/recommendations/places?category=Museos&interest=historia
+
+Events:
+
+GET /api/recommendations/events?category=Cultura
+
+GET /api/recommendations/events?category=Cultura&interest=familia
+
+Food:
+
+GET /api/recommendations/food?category=Restaurante
+
+GET /api/recommendations/food?category=Comida%20y%20bebida&interest=gastronomía%20tradicional
+
+Parámetros disponibles:
+
+category:
+- opcional;
+- filtra previamente los datos.
+
+interest:
+- opcional;
+- representa la preferencia del usuario.
+
+limit:
+- opcional;
+- valor predeterminado: 5;
+- máximo permitido: 6.
+
+Ejemplo:
+
+GET /api/recommendations/places?category=Museos&interest=historia&limit=6
+
+Nunca devolver más de 6 recomendaciones.
+
+==================================================
+9. FLUJO DE RECOMENDACIÓN
+==================================================
+
+NO enviar todos los registros disponibles directamente a Gemini.
+
+Implementar:
+
+Cliente
+   ↓
+recommendations.controller
+   ↓
+recommendations.service
+   ↓
+Obtener datos disponibles
+   ↓
+Filtrar por category
+   ↓
+Ranking local preliminar
+   ↓
+Seleccionar máximo 10 candidatos
+   ↓
+Gemini 2.5 Flash
+   ↓
+Seleccionar máximo 6
+   ↓
+Validar IDs
+   ↓
+Construir respuesta final
+   ↓
+Cliente
+
+==================================================
+10. RANKING PRELIMINAR
+==================================================
+
+Antes de llamar a Gemini, realizar un ranking local sencillo.
+
+El ranking puede considerar:
+
+- coincidencia con category;
+- existencia de descripción;
+- calidad/completitud de información;
+- existencia de imagen;
+- existencia de sourceUrl;
+- existencia de coordenadas cuando corresponda.
+
+No crear un algoritmo complejo.
+
+No utilizar información externa.
+
+El objetivo principal del ranking es:
+
+1. reducir candidatos;
+2. reducir tokens enviados a Gemini;
+3. mantener control sobre los datos;
+4. mejorar eficiencia.
+
+Seleccionar como máximo 10 candidatos para Gemini.
+
+Si existen menos de 10 candidatos, enviar únicamente los disponibles.
+
+==================================================
+11. INFORMACIÓN ENVIADA A GEMINI
+==================================================
+
+Enviar únicamente los campos necesarios.
+
+Ejemplo para Places:
+
+{
+  "id": "place-123",
+  "name": "Museo X",
+  "description": "Descripción real...",
+  "category": "Museos"
+}
+
+No enviar información innecesaria.
+
+No enviar secretos.
+
+No enviar la API key.
+
+No enviar información que no sea necesaria para la recomendación.
+
+==================================================
+12. PROMPT INTERNO PARA GEMINI
+==================================================
+
+Construir dinámicamente el prompt desde recommendations.service.js.
+
+Debe indicar:
+
+Categoría solicitada:
+Museos
+
+Interés:
+historia
+
+Candidatos:
+[lista de candidatos]
+
+Instrucciones:
+
+- Selecciona los candidatos más relevantes.
+- Devuelve únicamente IDs presentes en la lista.
+- No inventes lugares.
+- No inventes información.
+- No modifiques los nombres.
+- No modifiques las categorías.
+- No inventes coordenadas.
+- No inventes ingredientes.
+- Utiliza exclusivamente la información proporcionada.
+- Ordena de mayor a menor relevancia.
+- Devuelve máximo 6 recomendaciones.
+- Genera una razón breve para cada selección.
+- La razón debe basarse exclusivamente en la información disponible.
+
+==================================================
+13. VALIDACIÓN DE LA RESPUESTA DE GEMINI
+==================================================
+
+Nunca confiar ciegamente en la respuesta del modelo.
+
+Después de recibir la respuesta:
+
+1. Validar que sea JSON válido.
+2. Validar que recommendations sea un array.
+3. Validar que cada ID exista entre los candidatos enviados.
+4. Eliminar IDs inexistentes.
+5. Eliminar duplicados.
+6. Limitar a máximo 6 resultados.
+7. Validar que reason sea texto.
+8. Ignorar cualquier campo adicional no permitido.
+
+Si Gemini devuelve un ID que no existe en nuestros candidatos:
+
+NO agregarlo.
+
+Si Gemini inventa un lugar:
+
+NO agregarlo.
+
+Si Gemini devuelve una estructura inválida:
+
+manejar el error de forma controlada.
+
+==================================================
+14. RESPUESTA REST
+==================================================
+
+Mantener el contrato general de la API:
+
+{
+  "success": true,
+  "data": {
+    "category": "Museos",
+    "interest": "historia",
+    "recommendations": [
+      {
+        "id": "place-123",
+        "name": "Museo X",
+        "description": "...",
+        "category": "Museos",
+        "latitude": 10.4,
+        "longitude": -75.5,
+        "imageUrl": "...",
+        "source": "visit-cartagena",
+        "sourceUrl": "...",
+        "reason": "Destaca por su relación con la historia de Cartagena."
+      }
+    ]
+  },
+  "meta": {
+    "total": 5,
+    "source": "visit-cartagena",
+    "model": "gemini-2.5-flash"
+  }
+}
+
+IMPORTANTE:
+
+Los datos del lugar/evento/experiencia deben proceder de nuestra fuente original.
+
+Gemini solamente debe aportar principalmente:
+
+- selección;
+- orden;
+- reason.
+
+El backend debe reconstruir la respuesta final utilizando los datos originales.
+
+==================================================
+15. FOOD — REGLA ESPECIAL
+==================================================
+
+Visit Cartagena no proporciona actualmente ingredientes detallados de recetas.
+
+Nuestro contrato utiliza:
+
+"keyIngredients": []
+
+cuando la fuente no proporciona ingredientes.
+
+NO inventar ingredientes.
+
+Gemini tampoco puede completar o inferir ingredientes.
+
+Ejemplo:
+
+{
+  "name": "Café Quindío",
+  "keyIngredients": []
+}
+
+Gemini NO debe generar:
+
+"café, leche, azúcar..."
+
+si esa información no está en la fuente.
+
+La IA solamente puede seleccionar y explicar utilizando los datos entregados.
+
+==================================================
+16. FALLBACK Y ERRORES
+==================================================
+
+Los endpoints originales NO deben depender de Gemini.
+
+Si Gemini falla:
+
+GET /api/events
+
+GET /api/places
+
+GET /api/food
+
+deben continuar funcionando normalmente.
+
+Si el módulo de recomendaciones no puede utilizar Gemini debido a:
+
+- GEMINI_API_KEY ausente;
+- error de red;
+- timeout;
+- error HTTP;
+- límite de API;
+- respuesta inválida;
+- error del SDK;
+
+devolver un error REST controlado.
+
+Ejemplo:
+
+HTTP 503
+
+{
+  "success": false,
+  "error": {
+    "code": "RECOMMENDATION_SERVICE_UNAVAILABLE",
+    "message": "El servicio de recomendaciones no está disponible actualmente."
+  }
+}
+
+No exponer:
+
+- API key;
+- stack trace;
+- detalles internos;
+- credenciales;
+- información sensible.
+
+==================================================
+17. TIMEOUT
+==================================================
+
+Configurar timeout para Gemini.
+
+Variable:
+
+GEMINI_TIMEOUT_MS=10000
+
+No permitir solicitudes indefinidamente bloqueadas.
+
+El timeout debe ser manejado correctamente y convertirse en un error controlado.
+
+==================================================
+18. PRUEBAS UNITARIAS
+==================================================
+
+Agregar pruebas para:
+
+1. limit predeterminado = 5.
+2. limit máximo = 6.
+3. rechazo o normalización de valores mayores a 6.
+4. ranking preliminar.
+5. selección de máximo 10 candidatos.
+6. construcción del prompt.
+7. validación de IDs.
+8. eliminación de IDs inexistentes.
+9. eliminación de duplicados.
+10. validación de respuesta JSON.
+11. manejo de respuesta inválida de Gemini.
+12. manejo de error de Gemini.
+13. ausencia de GEMINI_API_KEY.
+14. construcción de respuesta final.
+15. protección de los endpoints existentes.
+
+IMPORTANTE:
+
+Las pruebas unitarias NO deben consumir la API real de Gemini.
+
+Mockear:
+
+src/integrations/gemini.api.js
+
+==================================================
+19. PRUEBA REAL DE GEMINI
+==================================================
+
+Después de completar las pruebas unitarias, realizar una prueba de integración real usando la GEMINI_API_KEY disponible localmente.
+
+NO imprimir la API key.
+
+Probar:
+
+GET /api/recommendations/places?category=Museos
+
+GET /api/recommendations/places?category=Museos&interest=historia
+
+GET /api/recommendations/events?category=Cultura
+
+GET /api/recommendations/food?category=Restaurante
+
+Verificar:
+
+- HTTP 200;
+- máximo 6 resultados;
+- IDs válidos;
+- razones generadas;
+- ningún dato inventado;
+- formato JSON correcto;
+- datos originales preservados.
+
+==================================================
+20. VALIDACIÓN DE LOS ENDPOINTS EXISTENTES
+==================================================
+
+Después de implementar recomendaciones, confirmar que continúan funcionando:
+
+GET /health
+
+GET /api/events
+
+GET /api/events/event-1
+
+GET /api/places
+
+GET /api/places/place-898
+
+GET /api/food
+
+GET /api/food/food-2685
+
+No modificar sus contratos.
+
+==================================================
+21. SEGURIDAD
+==================================================
+
+Revisar:
+
+.env
+.env.example
+.gitignore
+
+Confirmar:
+
+- .env no está versionado;
+- GEMINI_API_KEY no aparece en Git;
+- GEMINI_API_KEY no aparece en logs;
+- GEMINI_API_KEY no aparece en respuestas;
+- GEMINI_API_KEY no aparece en README;
+- GEMINI_API_KEY no aparece en tests.
+
+No crear archivos temporales con la API key.
+
+==================================================
+22. DEPENDENCIAS
+==================================================
+
+Agregar únicamente las dependencias necesarias.
+
+La dependencia principal para Gemini debe ser:
+
+@google/genai
+
+No instalar:
+
+@google/generative-ai
+
+No instalar frameworks innecesarios.
+
+Mantener el proyecto sencillo.
+
+==================================================
+23. RESTRICCIONES
+==================================================
+
+NO implementar:
+
+- frontend;
+- React;
+- Vue;
+- Angular;
+- base de datos;
+- autenticación;
+- usuarios;
+- historial;
+- perfiles;
+- personalización persistente;
+- Datos Abiertos;
+- scraping HTML;
+- Cheerio;
+- Playwright;
+- Redis;
+- microservicios;
+- sistemas complejos de machine learning.
+
+No cambiar la arquitectura existente innecesariamente.
+
+No modificar Events, Places o Food salvo que sea estrictamente necesario.
+
+==================================================
+24. NO INVENTAR INFORMACIÓN
+==================================================
+
+Esta es una regla fundamental de la Fase 4.
+
+La API debe tratar Visit Cartagena como fuente de verdad.
+
+Gemini es solamente un componente de recomendación.
+
+Permitido:
+
+- seleccionar;
+- ordenar;
+- generar reason;
+- interpretar la relación entre categoría e interés.
+
+No permitido:
+
+- crear lugares;
+- crear eventos;
+- crear restaurantes;
+- crear platos;
+- inventar ingredientes;
+- inventar coordenadas;
+- inventar categorías;
+- inventar direcciones;
+- inventar URLs;
+- introducir datos que no estén en los candidatos.
+
+==================================================
+25. RESULTADO ESPERADO
+==================================================
+
+La arquitectura final debe ser:
+
+Client
+   ↓
+recommendations.routes.js
+   ↓
+recommendations.controller.js
+   ↓
+recommendations.service.js
+   ↓
+   ┌──────────────────────────┐
+   │                          │
+   ▼                          ▼
+Events / Places / Food     gemini.api.js
+   │                          │
+   ▼                          ▼
+Visit Cartagena           @google/genai
+                              │
+                              ▼
+                       Gemini 2.5 Flash
+                              │
+                              ▼
+                       JSON estructurado
+                              │
+                              ▼
+                     Validación de IDs
+                              │
+                              ▼
+                      Respuesta REST
+
+==================================================
+26. CRITERIO DE ÉXITO
+==================================================
+
+La Fase 4 se considera terminada cuando:
+
+- @google/genai está correctamente instalado;
+- Gemini 2.5 Flash responde correctamente;
+- GEMINI_API_KEY se obtiene desde .env;
+- Structured Output funciona;
+- /api/recommendations/places funciona;
+- /api/recommendations/events funciona;
+- /api/recommendations/food funciona;
+- máximo 6 recomendaciones;
+- las recomendaciones pertenecen a candidatos reales;
+- no se inventan datos;
+- reason es generado por Gemini;
+- los datos originales son reconstruidos por nuestro backend;
+- los errores de Gemini están controlados;
+- los endpoints existentes continúan funcionando;
+- todas las pruebas unitarias pasan;
+- la prueba real con Gemini funciona.
+
+==================================================
+27. FINALIZACIÓN
+==================================================
+
+Al terminar:
+
+NO implementes nuevas funcionalidades.
+
+NO implementes Datos Abiertos.
+
+NO hagas commit.
+
+NO hagas push.
+
+Detente y entrega un informe con:
+
+1. Archivos creados.
+2. Archivos modificados.
+3. Dependencias agregadas.
+4. Modelo utilizado.
+5. SDK utilizado.
+6. Variables de entorno agregadas.
+7. Arquitectura final.
+8. Endpoints nuevos.
+9. Ejemplo real de /api/recommendations/places.
+10. Ejemplo real de /api/recommendations/events.
+11. Ejemplo real de /api/recommendations/food.
+12. Resultado de npm test.
+13. Cantidad total de pruebas.
+14. Resultado de las pruebas reales contra Gemini.
+15. Cómo se evita que Gemini invente información.
+16. Cómo se validan los IDs.
+17. Cómo se manejan errores y timeouts.
+18. Confirmar que Events, Places y Food continúan funcionando.
+19. Confirmar que no se implementó frontend.
+20. Confirmar que Datos Abiertos continúa fuera de alcance.
+
+Espera instrucciones después de entregar el informe.
